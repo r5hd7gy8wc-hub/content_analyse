@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BBS Rinteln – Instagram Dashboard (CSV Upload + Dynamische Strategie)</title>
+<style>
+  :root{
+    --maxw: 1400px;
+    --bg:#0f1220; --panel:#161a2e; --text:#e8ecff; --muted:#9aa3c7; --brand:#5b8cff;
+    --ok:#33d69f; --warn:#ffb020; --bad:#ff6b6b; --line:#24294a; --card:#1b2040; --chip:#20264d;
+    --link:#8ab3ff; --thead:#121636; --shadow: rgba(0,0,0,.25);
+    --tooltip-bg:#1f2446; --tooltip-text:#e8ecff; --tooltip-border:#3a448a;
+    --info:#ff8a00; /* Orange für Info-Icon */
+  }
+  html[data-theme="light"]{
+    --bg:#f6f7fb; --panel:#ffffff; --text:#0e1532; --muted:#5c688a; --brand:#2e6cff;
+    --ok:#0da678; --warn:#cc8a00; --bad:#d64545; --line:#dfe3f2; --card:#f3f6ff; --chip:#eef2ff;
+    --link:#1f5bd8; --thead:#eef2ff; --shadow: rgba(0,0,0,.08);
+    --tooltip-bg:#fff; --tooltip-text:#0e1532; --tooltip-border:#ccd4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  header{position:sticky;top:0;background:rgba(15,18,32,.8);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:10}
+  html[data-theme="light"] header{background:rgba(255,255,255,.85)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:16px}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  nav{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .tab-btn{padding:10px 14px;background:var(--chip);border:1px solid var(--line);border-radius:8px;color:var(--text);cursor:pointer}
+  .tab-btn.active{background:var(--brand);border-color:#6ea0ff;color:#fff}
+  .theme-toggle{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .theme-toggle input{width:42px;height:22px;appearance:none;background:#aaa;border-radius:999px;position:relative;outline:none;cursor:pointer}
+  .theme-toggle input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s}
+  .theme-toggle input:checked{background:#4d79ff}
+  .theme-toggle input:checked::after{left:23px}
+  main{padding:20px 0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:20px;box-shadow:0 6px 20px var(--shadow)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;position:relative}
+  .kpi h3{margin:0 0 6px 0;font-size:13px;color:var(--muted)}
+  .kpi .val{font-size:22px;font-weight:700}
+  .kpi.small .val{font-size:18px}
+  .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  select,input[type="date"]{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .btn{background:var(--brand);border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .uploader{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:16px;color:var(--text)}
+  .drop.drag{border-color:#6ea0ff;background:var(--thead)}
+  .file-name{font-size:12px;color:var(--muted);margin-left:8px}
+  table{width:100%;border-collapse:collapse;table-layout:auto}
+  th,td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{position:sticky;top:0;background:var(--thead);border-bottom:1px solid var(--line);text-align:left;font-size:12px;color:#3f5dce;cursor:pointer;white-space:nowrap}
+  html[data-theme="light"] th{color:#2744a6}
+  tbody tr:hover{background:var(--chip)}
+  .chip{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--chip);border:1px solid var(--line);font-size:12px;color:var(--text);white-space:nowrap}
+  .note{color:var(--muted);font-size:13px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;white-space:nowrap}
+  .badge.ok{background:rgba(51,214,159,.2);border:1px solid rgba(51,214,159,.4);color:var(--ok)}
+  .badge.warn{background:rgba(255,176,32,.2);border:1px solid rgba(255,176,32,.4);color:var(--warn)}
+  .badge.bad{background:rgba(255,107,107,.2);border:1px solid rgba(255,107,107,.4);color:var(--bad)}
+  a{color:var(--link);word-break:break-all}
+  footer{color:var(--muted);font-size:12px;padding:24px 0;border-top:1px solid var(--line);margin-top:20px}
+  @media (max-width:1100px){.grid{grid-template-columns:1fr}}
+
+  /* Tooltips – orange Icon */
+  .hint{display:inline-flex;align-items:center;gap:6px}
+  .hint .icon{
+    width:18px;height:18px;border-radius:50%;
+    background:rgba(255,138,0,.15); border:1px solid rgba(255,138,0,.6);
+    color:var(--info); display:inline-flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:12px;cursor:help
+  }
+  .hint .bubble{display:none;position:absolute;z-index:20;max-width:460px;background:var(--tooltip-bg);color:var(--tooltip-text);border:1px solid var(--tooltip-border);box-shadow:0 10px 30px var(--shadow);padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.4}
+  .hint:hover .bubble, .hint:focus-within .bubble{display:block}
+
+  /* Strategie */
+  .cols{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media (max-width:900px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .card h4{margin:0 0 8px 0;font-size:14px}
+  .pill{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:var(--chip);font-size:12px;margin-right:6px;margin-bottom:6px}
+  ul.clean{margin:0;padding-left:18px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div>
+        <h1 style="margin:0">BBS Rinteln – Instagram Insights Dashboard</h1>
+        <div class="sub">CSV-Upload: Instagram Export laden und automatisch auswerten</div>
+      </div>
+      <div class="theme-toggle" title="Light/Dark umschalten">
+        <span class="note">Theme</span>
+        <input type="checkbox" id="theme-switch" />
+      </div>
+    </div>
+    <nav>
+      <button class="tab-btn active" data-tab="posts">Posts-Tracking</button>
+      <button class="tab-btn" data-tab="summary">Zusammenfassung</button>
+      <button class="tab-btn" data-tab="abtests">A/B-Tests</button>
+      <button class="tab-btn" data-tab="utm">UTM-Linkliste</button>
+      <button class="tab-btn" data-tab="strategy">Content-Strategie</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="panel">
+    <h2 style="margin-top:0;font-size:18px">CSV laden</h2>
+    <p class="note">Wähle deine Instagram-CSV (z. B. „Nov-17-2025_Feb-14-2026_….csv“) aus oder ziehe sie hier hinein. Das Tool liest die relevanten Spalten automatisch.</p>
+    <div class="uploader">
+      <input type="file" id="file" accept=".csv" />
+      <button class="btn" id="btn-load">Laden</button>
+      <button class="btn secondary" id="btn-export">Aktuelle Ansicht als CSV exportieren</button>
+      <span class="file-name" id="file-name">Keine Datei gewählt</span>
+    </div>
+    <div id="drop" class="drop" style="margin-top:10px">CSV hierher ziehen und ablegen</div>
+    <p class="note" id="load-status"></p>
+  </section>
+
+  <!-- POSTS TAB -->
+  <section id="tab-posts" class="tab panel">
+    <div style="display:flex;align-items:center;gap:10px">
+      <h2 style="margin:0;font-size:18px">Posts-Tracking</h2>
+      <div class="hint" style="position:relative">
+        <div class="icon">i</div>
+        <div class="bubble">
+          Liste aller Posts mit Kennzahlen. ER = (Likes + Kommentare + Shares + Saves) / Reichweite.
+          Klicke auf Spaltenkopf zum Sortieren. Nutze Filter für Format und Zeitraum.
+        </div>
+      </div>
+    </div>
+
+    <div class="filters" style="margin-top:10px">
+      <label>Format:
+        <select id="f-format">
+          <option value="">Alle</option>
+          <option>Instagram-Reel</option>
+          <option>Instagram-Carousel</option>
+          <option>IG-Bild</option>
+        </select>
+      </label>
+      <label>Von: <input type="date" id="f-from"></label>
+      <label>Bis: <input type="date" id="f-to"></label>
+      <button class="btn" id="btn-reset">Filter zurücksetzen</button>
+    </div>
+
+    <div class="grid" id="kpi-grid">
+      <div class="kpi">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+          <h3>Durchschnittliche Reichweite</h3>
+          <div class="hint" style="position:relative">
+            <div class="icon">i</div>
+            <div class="bubble">Ø Reach aller gefilterten Posts. Zeigt Sichtbarkeit. Gut geeignet, um Formate zu vergleichen (Reels vs. Carousels vs. Bilder).</div>
+          </div>
+        </div>
+        <div class="val" id="kpi-avg-reach">–</div>
+      </div>
+      <div class="kpi">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+          <h3>Durchschnittliche ER</h3>
+          <div class="hint" style="position:relative">
+            <div class="icon">i</div>
+            <div class="bubble">ER (Engagement Rate) misst Interaktionsdichte: (Likes+Kommentare+Shares+Saves)/Reichweite. >5% stark, >8% sehr stark (Nischenabhängig).</div>
+          </div>
+        </div>
+        <div class="val" id="kpi-avg-er">–</div>
+      </div>
+      <div class="kpi">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+          <h3>Gesamt Shares</h3>
+          <div class="hint" style="position:relative">
+            <div class="icon">i</div>
+            <div class="bubble">Summe der geteilten Inhalte im Filter. Proxy für Empfehlbarkeit: Inhalte mit vielen Shares verbreiten sich organisch in neuen Netzwerken.</div>
+          </div>
+        </div>
+        <div class="val" id="kpi-sum-shares">–</div>
+      </div>
+    </div>
+
+    <div style="overflow:hidden;border:1px solid var(--line);border-radius:10px;margin-top:12px">
+      <div style="overflow:auto;max-height:540px">
+        <table id="posts-table" style="min-width:100%">
+          <thead>
+            <tr>
+              <th data-key="date">Datum</th>
+              <th data-key="time">Uhrzeit</th>
+              <th data-key="format">Format</th>
+              <th data-key="title">Titel/Topic</th>
+              <th data-key="reach">Reichweite</th>
+              <th data-key="views">Views</th>
+              <th data-key="likes">Likes</th>
+              <th data-key="comments">Kommentare</th>
+              <th data-key="shares">Shares</th>
+              <th data-key="saves">Saves</th>
+              <th data-key="newFollowers">Neue Follower</th>
+              <th data-key="cta">CTA</th>
+              <th data-key="notes">Notizen</th>
+              <th data-key="erNum">ER</th>
+            </tr>
+          </thead>
+          <tbody id="posts-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUMMARY TAB -->
+  <section id="tab-summary" class="tab panel" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px">
+      <h2 style="margin:0;font-size:18px">Zusammenfassung</h2>
+      <div class="hint" style="position:relative">
+        <div class="icon">i</div>
+        <div class="bubble">Aggregierte Kennzahlen aus der aktuellen Filteransicht: Ø Reichweiten nach Format, Top‑3 nach Reach/Shares, und Lowlights (unter 50% Median).</div>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div class="kpi"><h3>Reels – Ø Reichweite</h3><div class="val" id="sum-reel-avg">–</div></div>
+      <div class="kpi"><h3>Carousels – Ø Reichweite</h3><div class="val" id="sum-car-avg">–</div></div>
+      <div class="kpi"><h3>Bilder – Ø Reichweite</h3><div class="val" id="sum-img-avg">–</div></div>
+      <div class="kpi small"><h3>Top-Reichweite (Titel)</h3><div class="val" id="sum-top-title">–</div></div>
+      <div class="kpi small"><h3>Top-Reichweite (Wert)</h3><div class="val" id="sum-top-reach">–</div></div>
+      <div class="kpi small"><h3>Summe neue Follower</h3><div class="val" id="sum-new-fol">–</div></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h3 style="margin-top:0">Top 3 nach Reichweite</h3>
+      <ol id="top3-reach" class="note"></ol>
+      <h3>Top 3 nach Shares</h3>
+      <ol id="top3-shares" class="note"></ol>
+      <h3>Lowlights (unter 50% Median Reichweite)</h3>
+      <ul id="lowlights" class="note"></ul>
+    </div>
+  </section>
+
+  <!-- AB TESTS TAB -->
+  <section id="tab-abtests" class="tab panel" style="display:none">
+    <h2 style="margin-top:0;font-size:18px">A/B-Tests (manuell pflegen)</h2>
+    <p class="note">Notiere hier Hypothesen und Ergebnisse. (CSV-Upload beeinflusst diese Tabelle nicht.)</p>
+    <div style="overflow:hidden;border:1px solid var(--line);border-radius:10px">
+      <div style="overflow:auto;max-height:540px">
+        <table id="ab-table" style="min-width:100%">
+          <thead>
+            <tr>
+              <th>Test-Name</th><th>Hypothese</th><th>Variante A</th><th>Variante B</th><th>Primäre KPI</th><th>Ergebnis A</th><th>Ergebnis B</th><th>Gewinner</th><th>Learnings</th><th>Nächste Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="ab-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- UTM TAB -->
+  <section id="tab-utm" class="tab panel" style="display:none">
+    <h2 style="margin-top:0;font-size:18px">UTM-Linkliste</h2>
+    <p class="note">Kopiere die fertigen UTM-Links per Klick. Passe Ziel-URL/Kampagne an.</p>
+    <div style="overflow:hidden;border:1px solid var(--line);border-radius:10px">
+      <div style="overflow:auto;max-height:540px">
+        <table id="utm-table" style="min-width:100%">
+          <thead>
+            <tr>
+              <th>Zielseite</th><th>Kampagne</th><th>Medium</th><th>Source</th><th>Content</th><th>UTM-Link</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="utm-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRATEGY TAB (dynamisch) -->
+  <section id="tab-strategy" class="tab panel" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px">
+      <h2 style="margin:0;font-size:18px">Content-Strategie – Nächste 3 Monate (dynamisch)</h2>
+      <div class="hint" style="position:relative">
+        <div class="icon">i</div>
+        <div class="bubble">
+          Automatisch aus euren Daten berechnet: Top-Formate/Themen, empfohlene Serien, Frequenzen, Posting-Zeiten sowie konkrete Post-Ideen mit Hooks/CTAs. Aktualisiert sich bei neuem CSV/Filter.
+        </div>
+      </div>
+    </div>
+
+    <div id="strategy-content" style="margin-top:12px" class="note">Noch keine Daten. Bitte CSV laden.</div>
+  </section>
+
+  <footer>
+    Diese Seite verarbeitet CSV lokal im Browser. Keine Datenübertragung an Server. • Theme-Schalter oben rechts.
+  </footer>
+</main>
+
+<script>
+/* ====== Theme Toggle ====== */
+const themeSwitch = document.getElementById("theme-switch");
+function initTheme(){
+  const saved = localStorage.getItem("theme") || "dark";
+  document.documentElement.setAttribute("data-theme", saved);
+  themeSwitch.checked = saved==="light";
+}
+themeSwitch.addEventListener("change", ()=>{
+  const mode = themeSwitch.checked ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", mode);
+  localStorage.setItem("theme", mode);
+});
+initTheme();
+
+/* ====== CSV-Parsing & Mapping ====== */
+let RAW_POSTS = [];
+
+function parseCSV(text){
+  const rows = [];
+  let i=0, field="", row=[];
+  let inQuotes=false;
+  while(i<text.length){
+    const c = text[i];
+    if(c === '"'){
+      if(inQuotes && text[i+1] === '"'){ field += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if(c === ',' && !inQuotes){
+      row.push(field); field="";
+    } else if((c === '\n' || c === '\r') && !inQuotes){
+      if(field.length>0 || row.length>0){ row.push(field); field=""; rows.push(row); row=[]; }
+    } else {
+      field += c;
+    }
+    i++;
+  }
+  if(field.length>0 || row.length>0){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.length>1);
+}
+
+function mapHeaders(headerRow){
+  const H = {};
+  headerRow.forEach((h,idx)=>{
+    if(!h) return;
+    H[String(h).trim()] = idx;
+  });
+  return H;
+}
+
+const EXPECTED = {
+  date: "Datum",
+  time: "Verffentlichungszeit",
+  format: "Beitragsart",
+  title: "Beschreibung",
+  reach: "Reichweite",
+  views: "Aufrufe",
+  likes: "Gefllt mir-Angaben",
+  shares: "Geteilte Inhalte",
+  comments: "Kommentare",
+  saves: "Gespeicherte Inhalte",
+  newFollowers: "Neue Follower",
+  permalink: "Permalink"
+};
+
+function rowToPost(row, H){
+  function get(name){
+    const idx = H[name];
+    if(idx==null) return "";
+    return row[idx] ?? "";
+  }
+  function toNumber(v){
+    const n = parseInt(String(v).replace(/\D+/g,''), 10);
+    return isNaN(n) ? 0 : n;
+  }
+  function normalizeDate(dateStr){
+    const d = get(EXPECTED.date) || dateStr;
+    const m = String(d).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m){ return `${m[3]}-${m[1]}-${m[2]}`; }
+    return d ? String(d).split(" ")[0] : "";
+  }
+  function normalizeTime(dateStr){
+    const d = get(EXPECTED.date) || dateStr;
+    const m = String(d).match(/(\d{2}:\d{2})$/);
+    return m ? m[1] : "";
+  }
+
+  const dateRaw = get(EXPECTED.date);
+
+  return {
+    date: normalizeDate(dateRaw),
+    time: normalizeTime(dateRaw),
+    format: get(EXPECTED.format) || "",
+    title: (get(EXPECTED.title) || "").slice(0,120).replace(/\s+/g," ").trim(),
+    reach: toNumber(get(EXPECTED.reach)),
+    views: toNumber(get(EXPECTED.views)),
+    likes: toNumber(get(EXPECTED.likes)),
+    comments: toNumber(get(EXPECTED.comments)),
+    shares: toNumber(get(EXPECTED.shares)),
+    saves: toNumber(get(EXPECTED.saves)),
+    newFollowers: toNumber(get(EXPECTED.newFollowers)),
+    cta: "",
+    notes: get(EXPECTED.permalink) ? ("Link: "+get(EXPECTED.permalink)) : ""
+  };
+}
+
+function loadCSVFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const text = reader.result;
+      const rows = parseCSV(text);
+      if(!rows.length){ setStatus("Fehler: Datei leer oder nicht lesbar."); return; }
+      const headers = rows[0];
+      const H = mapHeaders(headers);
+
+      const required = [EXPECTED.date, EXPECTED.format, EXPECTED.reach];
+      const missing = required.filter(r=>H[r]==null);
+      if(missing.length){
+        setStatus("Fehlende Spalten: "+missing.join(", "));
+        return;
+      }
+
+      RAW_POSTS = rows.slice(1)
+        .map(r=>rowToPost(r,H))
+        .filter(p=>p.date);
+
+      setStatus("Geladen: "+RAW_POSTS.length+" Posts");
+      renderAll();
+    } catch(err){
+      console.error(err);
+      setStatus("Fehler beim Verarbeiten der CSV.");
+    }
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+/* ====== Upload & Export ====== */
+const fileInput = document.getElementById("file");
+const fileNameSpan = document.getElementById("file-name");
+const loadBtn = document.getElementById("btn-load");
+const dropZone = document.getElementById("drop");
+const statusP = document.getElementById("load-status");
+const exportBtn = document.getElementById("btn-export");
+
+fileInput.addEventListener("change", ()=>{
+  const f = fileInput.files[0];
+  fileNameSpan.textContent = f ? f.name : "Keine Datei gewählt";
+});
+loadBtn.addEventListener("click", ()=>{
+  const f = fileInput.files[0];
+  if(!f){ setStatus("Bitte zuerst eine CSV-Datei wählen."); return; }
+  loadCSVFile(f);
+});
+["dragenter","dragover"].forEach(evt=>{
+  dropZone.addEventListener(evt, (e)=>{ e.preventDefault(); dropZone.classList.add("drag"); setStatus("Datei loslassen zum Laden…"); });
+});
+["dragleave","drop"].forEach(evt=>{
+  dropZone.addEventListener(evt, (e)=>{ e.preventDefault(); dropZone.classList.remove("drag"); });
+});
+dropZone.addEventListener("drop", (e)=>{
+  const dt = e.dataTransfer;
+  const file = dt.files && dt.files[0];
+  if(file){
+    fileNameSpan.textContent = file.name;
+    loadCSVFile(file);
+  }
+});
+function setStatus(msg){ statusP.textContent = msg; }
+
+function exportCSV(rows){
+  const headers = ["Datum","Uhrzeit","Format","Titel/Topic","Reichweite","Views","Likes","Kommentare","Shares","Saves","Neue Follower","CTA","Notizen","ER"];
+  const lines = [headers.join(",")];
+  rows.forEach(r=>{
+    const engagement = (r.likes||0)+(r.comments||0)+(r.shares||0)+(r.saves||0);
+    const er = r.reach ? (engagement/r.reach) : 0;
+    const vals = [
+      r.date, r.time||"", r.format||"", r.title||"", r.reach||0, r.views||0, r.likes||0, r.comments||0, r.shares||0, r.saves||0, r.newFollowers||0, r.cta||"", r.notes||"",
+      (er*100).toFixed(2).replace(".",",")+"%"
+    ];
+    lines.push(vals.map(v=>String(v).includes(",")?('"'+String(v).replace(/"/g,'""')+'"'):v).join(","));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "instagram_insights_export.csv";
+  a.click();
+}
+exportBtn.addEventListener("click", ()=>{
+  const rows = getRows();
+  if(!rows.length){ setStatus("Nichts zu exportieren – lade zuerst eine CSV."); return; }
+  exportCSV(rows);
+});
+
+/* ====== Filter / Aggregation / Sortierung ====== */
+const state = { format:"", from:"", to:"", sortKey:"date", sortDir:"desc" };
+const fmt = (n) => n==null || isNaN(n) ? "–" : n.toLocaleString("de-DE");
+function parseDate(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function sourceRows(){ return RAW_POSTS.length ? RAW_POSTS : []; }
+
+function getRows(){
+  const src = sourceRows();
+  return src.filter(r=>{
+    if(state.format && r.format!==state.format) return false;
+    const d=parseDate(r.date);
+    if(state.from && d < parseDate(state.from)) return false;
+    if(state.to   && d > parseDate(state.to))   return false;
+    return true;
+  }).sort((a,b)=>{
+    let A=a[state.sortKey], B=b[state.sortKey];
+    if(state.sortKey==="date"){ A=parseDate(a.date); B=parseDate(b.date); }
+    if(state.sortKey==="erNum"){
+      const aEng=(a.likes||0)+(a.comments||0)+(a.shares||0)+(a.saves||0);
+      const bEng=(b.likes||0)+(b.comments||0)+(b.shares||0)+(b.saves||0);
+      A = a.reach? aEng/a.reach : -1; B = b.reach? bEng/b.reach : -1;
+    }
+    if(typeof A==="string"){ A=A.toLowerCase(); B=B.toLowerCase(); }
+    if(A<B) return state.sortDir==="asc"?-1:1;
+    if(A>B) return state.sortDir==="asc"?1:-1;
+    return 0;
+  });
+}
+
+function calcER(row){
+  const engagement = (row.likes||0)+(row.comments||0)+(row.shares||0)+(row.saves||0);
+  const er = row.reach ? engagement/row.reach : null;
+  return {engagement, er};
+}
+function computeKPIs(rows){
+  const sum=(a,k)=>a.reduce((s,x)=>s+(Number(x[k])||0),0);
+  const avg=(a,k)=>a.length? sum(a,k)/a.length : null;
+  const reels=rows.filter(r=>r.format==="Instagram-Reel");
+  const cars =rows.filter(r=>r.format==="Instagram-Carousel");
+  const imgs =rows.filter(r=>r.format==="IG-Bild");
+  const byReach=[...rows].sort((a,b)=>(b.reach||0)-(a.reach||0));
+  const reachVals=rows.map(r=>r.reach||0).sort((x,y)=>x-y);
+  const median = reachVals.length? (reachVals.length%2? reachVals[(reachVals.length-1)/2] : (reachVals[reachVals.length/2-1]+reachVals[reachVals.length/2])/2) : 0;
+  const low = rows.filter(r=>(r.reach||0)<0.5*median);
+  return {
+    avgReach: avg(rows,"reach"),
+    avgER: rows.length? rows.reduce((s,r)=>s+(calcER(r).er||0),0)/rows.length : null,
+    totalShares: sum(rows,"shares"),
+    reelAvg: avg(reels,"reach"), carAvg: avg(cars,"reach"), imgAvg: avg(imgs,"reach"),
+    top: byReach.slice(0,3), median, lowlights: low,
+    reels, cars, imgs
+  };
+}
+
+/* ====== Render Posts / Summary ====== */
+function renderPosts(){
+  const tbody=document.getElementById("posts-tbody"); tbody.innerHTML="";
+  const rows=getRows(); const k=computeKPIs(rows);
+  document.getElementById("kpi-avg-reach").textContent=rows.length?fmt(Math.round(k.avgReach||0)):"–";
+  document.getElementById("kpi-avg-er").textContent   =rows.length?((k.avgER*100).toFixed(1).replace(".",",")+"%"):"–";
+  document.getElementById("kpi-sum-shares").textContent=rows.length?fmt(k.totalShares||0):"–";
+  if(!rows.length){ const tr=document.createElement("tr"); tr.innerHTML=`<td colspan="14" class="note">Noch keine Daten. Bitte CSV laden.</td>`; tbody.appendChild(tr); return; }
+  rows.forEach(r=>{
+    const {er}=calcER(r);
+    const avg=k.avgER||0.00001;
+    const cls = er==null? "bad" : (er>=avg*1.25? "ok" : (er>=avg*0.75? "warn":"bad"));
+    const badge = er==null? "–" : `<span class="badge ${cls}">${(er*100).toFixed(1).replace(".",",")}%</span>`;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td>${r.date}</td><td>${r.time||""}</td><td><span class="chip">${r.format}</span></td>
+      <td>${r.title||""}</td><td>${fmt(r.reach)}</td><td>${fmt(r.views)}</td>
+      <td>${fmt(r.likes)}</td><td>${fmt(r.comments)}</td><td>${fmt(r.shares)}</td><td>${fmt(r.saves)}</td>
+      <td>${fmt(r.newFollowers)}</td><td>${r.cta||""}</td><td class="note">${r.notes||""}</td><td>${badge}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderSummary(){
+  const rows=getRows(); const k=computeKPIs(rows);
+  document.getElementById("sum-reel-avg").textContent=rows.length?fmt(Math.round(k.reelAvg||0)):"–";
+  document.getElementById("sum-car-avg").textContent =rows.length?fmt(Math.round(k.carAvg||0)) :"–";
+  document.getElementById("sum-img-avg").textContent =rows.length?fmt(Math.round(k.imgAvg||0)) :"–";
+  const top=rows.length? k.top[0]:null;
+  document.getElementById("sum-top-title").textContent=top?top.title:"–";
+  document.getElementById("sum-top-reach").textContent=top?fmt(top.reach):"–";
+  document.getElementById("sum-new-fol").textContent  =rows.length?fmt(rows.reduce((a,r)=>a+(r.newFollowers||0),0)):"–";
+  const olR=document.getElementById("top3-reach"); olR.innerHTML="";
+  const olS=document.getElementById("top3-shares"); olS.innerHTML="";
+  const ulL=document.getElementById("lowlights");   ulL.innerHTML="";
+  if(rows.length){
+    [...rows].sort((a,b)=>(b.reach||0)-(a.reach||0)).slice(0,3).forEach(r=>{ const li=document.createElement("li"); li.textContent=`${r.title} — Reach ${fmt(r.reach)} (${r.format})`; olR.appendChild(li); });
+    [...rows].sort((a,b)=>(b.shares||0)-(a.shares||0)).slice(0,3).forEach(r=>{ const li=document.createElement("li"); li.textContent=`${r.title} — Shares ${fmt(r.shares)} (Reach ${fmt(r.reach)})`; olS.appendChild(li); });
+    const m=k.median;
+    const lows=k.lowlights;
+    if(!lows.length){ const li=document.createElement("li"); li.textContent="Keine Lowlights im aktuellen Filter."; ulL.appendChild(li); }
+    else lows.forEach(r=>{ const li=document.createElement("li"); li.textContent=`${r.title} — Reach ${fmt(r.reach)} (Median ${fmt(Math.round(m))})`; ulL.appendChild(li); });
+  } else { const li=document.createElement("li"); li.textContent="Noch keine Daten."; ulL.appendChild(li); }
+}
+
+/* ====== Dynamische Content-Strategie ====== */
+function topN(arr, key, n=3){ return [...arr].sort((a,b)=>(b[key]||0)-(a[key]||0)).slice(0,n); }
+function median(arr){ const a=[...arr].sort((x,y)=>x-y); if(!a.length) return 0; return a.length%2? a[(a.length-1)/2] : (a[a.length/2-1]+a[a.length/2])/2; }
+
+function buildStrategy(){
+  const el=document.getElementById("strategy-content");
+  const rows=getRows();
+  if(!rows.length){ el.textContent="Noch keine Daten. Bitte CSV laden."; return; }
+
+  const byReach=topN(rows,"reach",10);
+  const byShares=topN(rows,"shares",10);
+  const bySaves=topN(rows,"saves",10);
+
+  // Deduplikation je Titel (einfacher Key)
+  const used=new Set();
+  function pickNext(list){ return list.find(p=>p && !used.has(p.title)); }
+  const topReach = pickNext(byReach); if(topReach) used.add(topReach.title);
+  const topShare = pickNext(byShares) || pickNext(byReach); if(topShare) used.add(topShare.title);
+  const topSave  = pickNext(bySaves)  || pickNext(byReach); if(topSave)  used.add(topSave.title);
+
+  const k=computeKPIs(rows);
+  const avgByFormat={ reel:Math.round(k.reelAvg||0), car:Math.round(k.carAvg||0) };
+  const reachAll=rows.map(r=>r.reach||0); const medReach=Math.round(median(reachAll));
+  const reelTarget=Math.round((avgByFormat.reel||medReach)*1.3);
+  const saveTarget=Math.round(((rows.reduce((a,r)=>a+(r.saves||0),0)/Math.max(1,rows.length))) * 1.3);
+
+  const stop=new Set(["und","der","die","das","mit","für","den","ein","eine","in","im","an","am","auf","von","vor","nach","ist","sind","wir","heute","unsere","schule","schüler","schueler","rinteln"]);
+  const wordFreq={};
+  rows.forEach(r=>{
+    (r.title||"").toLowerCase().replace(/[^a-zäöüß0-9\s]/g," ").split(/\s+/)
+      .filter(x=>x.length>3&&!stop.has(x))
+      .forEach(w=>wordFreq[w]=(wordFreq[w]||0)+1);
+  });
+  const topWords=Object.entries(wordFreq).sort((a,b)=>b[1]-a[1]).slice(0,10).map(x=>x[0]);
+  const bestTimes=suggestTimes(rows);
+
+  function ideaFrom(p, type){
+    const base=(p?.title||"").split(" ").slice(0,6).join(" ")|| (type==="Reel"?"Rundgang":"FAQ/Checkliste");
+    if(type==="Reel") return { title:`Reel: ${base}`, hook:"3 Gründe, warum du das nicht verpassen solltest", cta:"Teile mit jemandem, der dabei sein sollte" };
+    if(type==="Carousel") return { title:`Carousel: ${base}`, hook:"5 häufige Fragen + kurze Antworten", cta:"Speichern für später" };
+    return { title:`Bild: ${base}`, hook:"Behind the Scenes / Danke an …", cta:"Kommentiere deine Frage" };
+  }
+  const ideas=[
+    ideaFrom(topReach,"Reel"),
+    ideaFrom(topShare,"Carousel"),
+    ideaFrom(topSave,"Image")
+  ];
+
+  el.innerHTML=`
+    <div class="card">
+      <h4>Was funktioniert bei euch aktuell am besten?</h4>
+      <div class="pill">Top Reach: ${topReach?.title || "–"}</div>
+      <div class="pill">Top Shares: ${topShare?.title || "–"}</div>
+      <div class="pill">Top Saves: ${topSave?.title || "–"}</div>
+      <div class="pill">Ø Reel-Reichweite: ${fmt(avgByFormat.reel)}</div>
+      <div class="pill">Ø Carousel-Reichweite: ${fmt(avgByFormat.car)}</div>
+      <div class="pill">Häufige Themen: ${topWords.slice(0,5).join(", ") || "–"}</div>
+    </div>
+    <div class="cols" style="margin-top:12px">
+      <div class="card">
+        <h4>Ziele (90 Tage)</h4>
+        <ul class="clean">
+          <li>Reel‑Ø‑Reichweite ~${fmt(reelTarget)} (aktuell ~${fmt(avgByFormat.reel)})</li>
+          <li>Saves/Carousel +30% auf ~${fmt(saveTarget)}</li>
+          <li>+5–10% neue Follower/Monat</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Frequenz & Zeiten</h4>
+        <ul class="clean">
+          <li>2–3 Reels/Woche (Hooks 0–2 s, 12–20 s)</li>
+          <li>2 Carousels/Woche (Poster‑Slide + Save‑CTA)</li>
+          <li>1 Bild/Woche (Community/Partner)</li>
+          <li>Beste Zeiten: ${bestTimes.join(", ")}</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cols" style="margin-top:12px">
+      <div class="card">
+        <h4>Serien</h4>
+        <ul class="clean">
+          <li>Rundgang/Onsite (Reel): 30 s, „3 Stationen durch [Thema]“</li>
+          <li>1 Minute Berufsorientierung (Reel): „3 Dinge über [${topWords[0]||"Thema"}]“</li>
+          <li>FAQ Freitag (Carousel): „5 Fragen zu [${topWords[1]||"Bereich"}]“</li>
+          <li>People Spotlight (Bild/Carousel)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Konkrete Content‑Ideen</h4>
+        <ul class="clean">
+          ${ideas.map(i=>`<li><b>${i.title}</b> – Hook: „${i.hook}“ • CTA: „${i.cta}“</li>`).join("")}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function suggestTimes(rows){
+  const map={};
+  rows.forEach(r=>{
+    if(!r.time) return;
+    const h=Number(r.time.split(":")[0]||0);
+    const score=(r.likes||0)+(r.comments||0)+(r.shares||0)+(r.saves||0);
+    map[h]=(map[h]||0)+score;
+  });
+  const out=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([h])=>h.toString().padStart(2,"0")+":00");
+  return out.length? out : ["08:00","18:00"];
+}
+
+/* ====== A/B-Tests ====== */
+function renderAB(){
+  const tbody=document.getElementById("ab-tbody"); tbody.innerHTML="";
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td colspan="10" class="note">
+    Anleitung: Plane zwei nahezu identische Posts, ändere nur EINE Variable (Hook/Thumbnail/Zeit).
+    Trage beide hier ein und vergleiche eine KPI (z. B. Shares/Reichweite).
+    <button class="btn secondary" id="ab-add">Vorlage einfügen</button>
+  </td>`;
+  tbody.appendChild(tr);
+  document.getElementById("ab-add").addEventListener("click", ()=>{
+    const row=document.createElement("tr");
+    row.innerHTML=`<td>Hook: Frage vs. Fakt</td><td>Frage erhöht Shares</td><td>Reel A (Datum)</td><td>Reel B (Datum)</td><td>Shares/Reichweite</td><td></td><td></td><td></td><td>Lerneffekt…</td><td>Nächste Aktion…</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+/* ====== UTM-Linkliste (mit Erklärung + dynamischen Vorschlägen) ====== */
+function renderUTM(){
+  const tbody=document.getElementById("utm-tbody"); tbody.innerHTML="";
+  const infoRow=document.createElement("tr");
+  infoRow.innerHTML=`<td colspan="7" class="note">
+    Wozu UTM? Markiere Links (utm_source/medium/campaign/content), um in Web‑Analytics zu sehen,
+    welcher Instagram‑Post Klicks/Anmeldungen bringt. So fließen harte Klick-Daten in die Content‑Strategie ein.
+  </td>`;
+  tbody.appendChild(infoRow);
+
+  const rows=getRows();
+  const now=new Date(); const q=Math.floor((now.getMonth())/3)+1;
+  const topFormat = rows.length? rows[0].format : "Instagram-Reel";
+  const mediaMap={ "Instagram-Reel":"reel", "Instagram-Carousel":"carousel", "IG-Bild":"post" };
+
+  const wordCount={}; rows.forEach(r=>{ (r.title||"").toLowerCase().split(/\s+/).forEach(w=>{ if(w.length>3) wordCount[w]=(wordCount[w]||0)+1; }); });
+  const topWord = Object.entries(wordCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || "kampagne";
+  const suggCampaign = `${topWord}_q${q}`.replace(/[^a-z0-9_]/g,"");
+  const suggMedium = "instagram";
+  const suggSource = "bio";
+  const suggContent = mediaMap[topFormat] || "reel";
+
+  const suggestions = [
+    {url:"https://www.bbs-rinteln.de/anmeldung", campaign:suggCampaign, medium:suggMedium, source:"bio", content:"linkliste"},
+    {url:"https://www.bbs-rinteln.de/infos-bewerbung", campaign:`${topWord}_faq_q${q}`, medium:suggMedium, source:suggContent, content:"hook_frage"}
+  ];
+
+  suggestions.forEach(u=>{
+    const utm = `${u.url}?utm_source=${encodeURIComponent(u.source)}&utm_medium=${encodeURIComponent(u.medium)}&utm_campaign=${encodeURIComponent(u.campaign)}&utm_content=${encodeURIComponent(u.content)}`;
+    const tr=document.createElement("tr");
+    tr.innerHTML = `
+      <td>${u.url}</td><td>${u.campaign}</td><td>${u.medium}</td><td>${u.source}</td><td>${u.content}</td>
+      <td><a href="${utm}" target="_blank">${utm}</a></td>
+      <td><button class="btn" data-copy="${utm}">Kopieren</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  tbody.addEventListener("click",(e)=>{
+    const btn=e.target.closest("button[data-copy]");
+    if(btn){ navigator.clipboard.writeText(btn.dataset.copy).then(()=>{ btn.textContent="Kopiert!"; setTimeout(()=>btn.textContent="Kopieren",1200); }); }
+  });
+}
+
+/* ====== Tabs & Events ====== */
+document.querySelectorAll(".tab-btn").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    const t=b.dataset.tab;
+    document.querySelectorAll("section.tab").forEach(s=>s.style.display="none");
+    document.getElementById("tab-"+t).style.display="";
+    if(t==="summary") renderSummary();
+    if(t==="abtests") renderAB();
+    if(t==="utm") renderUTM();
+    if(t==="strategy") buildStrategy();
+  });
+});
+document.querySelectorAll("#posts-table thead th").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const key=th.getAttribute("data-key"); if(!key) return;
+    state.sortKey=key; state.sortDir=state.sortDir==="asc"?"desc":"asc";
+    renderPosts();
+    buildStrategy();
+  });
+});
+document.getElementById("f-format").addEventListener("change", e=>{ state.format=e.target.value; renderPosts(); buildStrategy(); });
+document.getElementById("f-from").addEventListener("change", e=>{ state.from=e.target.value; renderPosts(); buildStrategy(); });
+document.getElementById("f-to").addEventListener("change", e=>{ state.to=e.target.value; renderPosts(); buildStrategy(); });
+document.getElementById("btn-reset").addEventListener("click", ()=>{
+  state.format=""; state.from=""; state.to="";
+  document.getElementById("f-format").value="";
+  document.getElementById("f-from").value="";
+  document.getElementById("f-to").value="";
+  renderPosts(); buildStrategy();
+});
+
+/* ====== Initial ====== */
+function renderAll(){ renderPosts(); }
+renderAll();
+</script>
+</body>
+</html>
